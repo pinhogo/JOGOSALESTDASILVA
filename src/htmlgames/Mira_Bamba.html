@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treino de Mira - Modo Agrupado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        
+        .target {
+            position: absolute;
+            border-radius: 50%;
+            cursor: pointer;
+            background: radial-gradient(circle, #fca5a5, #ef4444); /* Cor vermelha */
+            box-shadow: 0 0 15px #ef4444, 0 0 25px #fca5a5;
+            transition: transform 0.1s;
+        }
+
+        .target:hover {
+            transform: scale(1.1);
+        }
+        
+        #game-area {
+            background-color: #1a202c;
+            background-image:
+                radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.1) 2%, transparent 0%),
+                radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.1) 2%, transparent 0%);
+            background-size: 100px 100px;
+            overflow: hidden;
+            position: relative;
+            transition: box-shadow 0.2s ease-out;
+        }
+
+        #game-area.miss {
+            box-shadow: inset 0 0 0 4px #ef4444, 0 0 20px #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-5xl mx-auto p-4 sm:p-6 md:p-8">
+        
+        <div id="header-panel" class="text-center mb-6">
+            <h1 class="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-red-600">Aim Trainer: Agrupado</h1>
+            <p class="text-gray-400 mt-2">Os alvos agora aparecem agrupados. Não perca o foco na área de ação!</p>
+        </div>
+
+        <div id="stats-panel" class="flex justify-around items-center bg-gray-800 p-4 rounded-xl shadow-lg mb-6 text-lg sm:text-xl">
+            <div>
+                <span class="font-medium text-gray-400">Pontuação: </span>
+                <span id="score" class="font-bold text-2xl sm:text-3xl text-red-400">0</span>
+            </div>
+            <div>
+                <span class="font-medium text-gray-400">Tempo: </span>
+                <span id="time" class="font-bold text-2xl sm:text-3xl text-red-400">30</span>
+            </div>
+        </div>
+
+        <div id="game-area" class="w-full h-96 sm:h-[500px] md:h-[600px] rounded-xl shadow-2xl cursor-crosshair">
+            <div id="ingame-timer" class="hidden absolute top-4 right-4 bg-black bg-opacity-50 text-white text-2xl font-bold px-4 py-2 rounded-lg"></div>
+        </div>
+
+        <div class="text-center mt-6">
+            <button id="start-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-500/50">
+                Iniciar Jogo
+            </button>
+            <p id="end-message" class="text-2xl mt-4 hidden"></p>
+        </div>
+    </div>
+
+    <script>
+        const gameArea = document.getElementById('game-area');
+        const scoreDisplay = document.getElementById('score');
+        const timeDisplay = document.getElementById('time');
+        const startBtn = document.getElementById('start-btn');
+        const endMessage = document.getElementById('end-message');
+        const headerPanel = document.getElementById('header-panel');
+        const statsPanel = document.getElementById('stats-panel');
+        const ingameTimer = document.getElementById('ingame-timer');
+
+        let score = 0;
+        let timeLeft = 30;
+        let gameInterval = null;
+        let isGameOver = true;
+
+        const maxTargets = 4;
+        const initialTargetSize = 80;
+        const minTargetSize = 15;
+        const sizeReduction = 1;
+        let currentTargetSize = initialTargetSize;
+
+        function startGame() {
+            score = 0;
+            timeLeft = 30;
+            isGameOver = false;
+            currentTargetSize = initialTargetSize;
+            
+            scoreDisplay.textContent = score;
+            timeDisplay.textContent = timeLeft;
+            ingameTimer.textContent = timeLeft;
+            headerPanel.classList.add('hidden');
+            statsPanel.classList.add('hidden');
+            ingameTimer.classList.remove('hidden');
+            startBtn.classList.add('hidden');
+            endMessage.classList.add('hidden');
+            gameArea.innerHTML = '';
+            gameArea.appendChild(ingameTimer);
+
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                ingameTimer.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+            
+            for (let i = 0; i < maxTargets; i++) {
+                spawnTarget();
+            }
+        }
+        
+        function endGame() {
+            isGameOver = true;
+            clearInterval(gameInterval);
+            gameArea.innerHTML = '';
+            
+            scoreDisplay.textContent = score;
+            endMessage.textContent = `Fim de jogo! Sua pontuação final: ${score}`;
+            headerPanel.classList.remove('hidden');
+            statsPanel.classList.remove('hidden');
+            ingameTimer.classList.add('hidden');
+            endMessage.classList.remove('hidden');
+            startBtn.textContent = 'Jogar Novamente';
+            startBtn.classList.remove('hidden');
+        }
+
+        function spawnTarget() {
+            if (isGameOver) return;
+
+            const existingTargets = Array.from(gameArea.getElementsByClassName('target'));
+            const gameRect = gameArea.getBoundingClientRect();
+            const size = currentTargetSize;
+            const radius = size / 2;
+            
+            let finalX, finalY;
+            let positionFound = false;
+            const maxAttempts = 50; // Previne loops infinitos
+
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                let candidateX, candidateY;
+
+                if (existingTargets.length > 0) {
+                    const anchorTarget = existingTargets[Math.floor(Math.random() * existingTargets.length)];
+                    const anchorX = anchorTarget.offsetLeft + radius;
+                    const anchorY = anchorTarget.offsetTop + radius;
+                    
+                    const angle = Math.random() * 2 * Math.PI;
+                    const distance = size + Math.random() * (size * 1.5); // Distância para surgir perto
+                    
+                    candidateX = anchorX + Math.cos(angle) * distance;
+                    candidateY = anchorY + Math.sin(angle) * distance;
+                } else {
+                    // Primeiro alvo surge aleatoriamente
+                    candidateX = Math.random() * (gameRect.width - size) + radius;
+                    candidateY = Math.random() * (gameRect.height - size) + radius;
+                }
+
+                // Checa se está dentro da área de jogo
+                if (candidateX - radius < 0 || candidateX + radius > gameRect.width || candidateY - radius < 0 || candidateY + radius > gameRect.height) {
+                    continue;
+                }
+
+                // Checa se sobrepõe outros alvos
+                let isOverlapping = false;
+                for (const otherTarget of existingTargets) {
+                    const otherX = otherTarget.offsetLeft + radius;
+                    const otherY = otherTarget.offsetTop + radius;
+                    const dx = candidateX - otherX;
+                    const dy = candidateY - otherY;
+                    const distanceBetweenCenters = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distanceBetweenCenters < size) { // size = raio1 + raio2
+                        isOverlapping = true;
+                        break;
+                    }
+                }
+
+                if (!isOverlapping) {
+                    positionFound = true;
+                    finalX = candidateX - radius; // Converte do centro para a posição 'left'
+                    finalY = candidateY - radius; // Converte do centro para a posição 'top'
+                    break;
+                }
+            }
+
+            if (!positionFound) {
+                // Fallback para uma posição aleatória se não encontrar lugar
+                finalX = Math.random() * (gameRect.width - size);
+                finalY = Math.random() * (gameRect.height - size);
+            }
+            
+            const target = document.createElement('div');
+            target.classList.add('target');
+            target.style.width = `${size}px`;
+            target.style.height = `${size}px`;
+            target.style.left = `${finalX}px`;
+            target.style.top = `${finalY}px`;
+            
+            target.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (!isGameOver) {
+                    score++;
+                    if (currentTargetSize > minTargetSize) {
+                        currentTargetSize -= sizeReduction;
+                    }
+                    gameArea.removeChild(target);
+                    spawnTarget();
+                }
+            });
+            
+            gameArea.appendChild(target);
+        }
+
+        startBtn.addEventListener('click', startGame);
+
+        gameArea.addEventListener('click', () => {
+            if (!isGameOver && gameArea.getElementsByClassName('target').length > 0) {
+                score -= 2;
+                gameArea.classList.add('miss');
+                setTimeout(() => {
+                    gameArea.classList.remove('miss');
+                }, 150);
+            }
+        });
+    </script>
+</body>
+</html>
+
