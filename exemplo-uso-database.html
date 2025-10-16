@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exemplo - Sistema de Recordes</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- SQL.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    
+    <!-- Database Scripts -->
+    <script src="src/scripts/database.js"></script>
+    <script src="src/scripts/leaderboard.js"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="src/styles/main.css">
+    
+    <style>
+        .demo-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+        }
+
+        .demo-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .demo-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 217, 255, 0.5);
+        }
+
+        .demo-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .score-display {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(0, 217, 255, 0.1);
+            border-radius: 15px;
+        }
+
+        .score-display h2 {
+            color: var(--accent-primary);
+            font-size: 3rem;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .info-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid var(--accent-primary);
+        }
+
+        .info-box h3 {
+            color: var(--accent-primary);
+            margin-bottom: 10px;
+        }
+
+        .info-box code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="demo-container">
+            <header style="text-align: center; margin-bottom: 40px;">
+                <h1>🎮 Sistema de Recordes SQLite</h1>
+                <p class="subtitle">Exemplo de uso do banco de dados</p>
+            </header>
+
+            <!-- Controles de Demo -->
+            <div class="demo-controls">
+                <button class="demo-btn" onclick="simulateGame()">🎯 Simular Jogo</button>
+                <button class="demo-btn" onclick="showLeaderboard()">🏆 Ver Ranking</button>
+                <button class="demo-btn secondary" onclick="changePlayerName()">👤 Mudar Nome</button>
+                <button class="demo-btn secondary" onclick="clearData()">🗑️ Limpar Dados</button>
+                <button class="demo-btn secondary" onclick="exportData()">💾 Exportar JSON</button>
+            </div>
+
+            <!-- Display de Pontuação -->
+            <div class="score-display">
+                <p style="color: var(--text-secondary);">Pontuação Atual</p>
+                <h2 id="currentScore">0</h2>
+                <p id="scoreMessage" style="color: var(--accent-primary); margin-top: 10px;"></p>
+            </div>
+
+            <!-- Leaderboard -->
+            <div id="leaderboard"></div>
+
+            <!-- Instruções -->
+            <div class="info-box">
+                <h3>📖 Como usar no seu jogo:</h3>
+                <p>1. Adicione as bibliotecas no seu HTML:</p>
+                <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; overflow-x: auto;"><code>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"&gt;&lt;/script&gt;
+&lt;script src="src/scripts/database.js"&gt;&lt;/script&gt;
+&lt;script src="src/scripts/leaderboard.js"&gt;&lt;/script&gt;</code></pre>
+
+                <p style="margin-top: 15px;">2. Inicialize o banco quando a página carregar:</p>
+                <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; overflow-x: auto;"><code>// No seu script do jogo
+window.addEventListener('load', async () => {
+    await gameDB.init();
+    console.log('Banco inicializado!');
+});</code></pre>
+
+                <p style="margin-top: 15px;">3. Salve recordes quando o jogo terminar:</p>
+                <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; overflow-x: auto;"><code>// Quando o jogo termina
+const leaderboard = new Leaderboard('Mira Bamba');
+const result = await leaderboard.saveScore(
+    pontuacao,  // pontuação do jogador
+    nivel,      // nível alcançado (opcional)
+    tempo       // tempo jogado em segundos (opcional)
+);</code></pre>
+
+                <p style="margin-top: 15px;">4. Mostre o ranking:</p>
+                <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; overflow-x: auto;"><code>// Exibe top 10
+const leaderboard = new Leaderboard('Mira Bamba');
+await leaderboard.displayRanking('ranking-container', 10);</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let leaderboard;
+        let currentScore = 0;
+
+        // Inicializa o banco quando a página carregar
+        window.addEventListener('load', async () => {
+            console.log('🔄 Inicializando banco de dados...');
+            await gameDB.init();
+            
+            leaderboard = new Leaderboard('Jogo de Teste');
+            
+            // Mostra o ranking inicial
+            await showLeaderboard();
+            
+            console.log('✅ Sistema pronto!');
+        });
+
+        // Simula uma partida de jogo
+        async function simulateGame() {
+            // Gera pontuação aleatória
+            currentScore = Math.floor(Math.random() * 10000) + 100;
+            const level = Math.floor(Math.random() * 10) + 1;
+            const timePlayed = Math.floor(Math.random() * 300) + 30;
+            
+            document.getElementById('currentScore').textContent = currentScore.toLocaleString();
+            
+            // Salva o recorde
+            const result = await leaderboard.saveScore(currentScore, level, timePlayed);
+            
+            if (result.success) {
+                if (result.isNewBest) {
+                    document.getElementById('scoreMessage').textContent = 
+                        '🎉 NOVO RECORDE PESSOAL! 🎉';
+                } else {
+                    document.getElementById('scoreMessage').textContent = 
+                        `Seu recorde: ${result.personalBest.toLocaleString()} pts`;
+                }
+                
+                // Atualiza o ranking
+                await showLeaderboard();
+            }
+        }
+
+        // Mostra o leaderboard
+        async function showLeaderboard() {
+            await leaderboard.displayRanking('leaderboard', 10);
+        }
+
+        // Muda nome do jogador
+        async function changePlayerName() {
+            if (leaderboard.changePlayer()) {
+                alert('✅ Nome alterado com sucesso!');
+                await showLeaderboard();
+            }
+        }
+
+        // Limpa todos os dados
+        function clearData() {
+            if (gameDB.clearAllData()) {
+                currentScore = 0;
+                document.getElementById('currentScore').textContent = '0';
+                document.getElementById('scoreMessage').textContent = '';
+                showLeaderboard();
+            }
+        }
+
+        // Exporta dados para JSON
+        function exportData() {
+            const json = gameDB.exportToJSON();
+            if (json) {
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `game-records-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                alert('✅ Dados exportados com sucesso!');
+            }
+        }
+    </script>
+</body>
+</html>
